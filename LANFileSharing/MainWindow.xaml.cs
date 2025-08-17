@@ -302,6 +302,28 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             DarkThemeMenuItem.IsChecked = themePreference == "DarkTheme";
         }
 
+        public void ProcessCommandLineArgs(string[] args)
+        {
+            if (args != null && args.Length > 0)
+            {
+                selectedPaths = args;
+
+                // Update UI to reflect the selected files
+                if (args.Length == 1 && Directory.Exists(args[0]))
+                {
+                    FilePathText.Text = $"Folder: {Path.GetFileName(args[0])}";
+                }
+                else
+                {
+                    FilePathText.Text = $"{args.Length} file(s) selected";
+                }
+
+                SendButton.IsEnabled = true;
+                SendTabControl.SelectedItem = SendTabControl.Items[0]; // Switch to the "Files / Folders" tab
+                Log($"{args.Length} item(s) selected via 'Send To' context menu.");
+            }
+        }
+
         // ======================================================================
         // == DRAG & DROP LOGIC
         // ======================================================================
@@ -684,7 +706,9 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             if (Properties.Settings.Default.ShowReceiveNotification)
             {
                 if (Properties.Settings.Default.PlaySoundOnCompletion) SystemSounds.Asterisk.Play();
-                Dispatcher.Invoke(() => MessageBox.Show($"{fileCount} file(s) received and saved to your '{Path.GetFileName(savePath)}' folder.", "Transfer Complete", MessageBoxButton.OK, MessageBoxImage.Information));
+                // Use the less intrusive balloon tip notification instead of a MessageBox
+                string message = $"{fileCount} file(s) received and saved to your '{Path.GetFileName(savePath)}' folder.";
+                Dispatcher.Invoke(() => TrayIcon.ShowBalloonTip("Transfer Complete", message, BalloonIcon.Info));
             }
         }
 
@@ -738,7 +762,9 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             if (Properties.Settings.Default.ShowReceiveNotification)
             {
                 if (Properties.Settings.Default.PlaySoundOnCompletion) SystemSounds.Asterisk.Play();
-                Dispatcher.Invoke(() => MessageBox.Show($"Folder '{sanitizedRoot}' received and saved to your '{Path.GetFileName(savePath)}' folder.", "Transfer Complete", MessageBoxButton.OK, MessageBoxImage.Information));
+                // Use the less intrusive balloon tip notification instead of a MessageBox
+                string message = $"Folder '{sanitizedRoot}' received and saved to your '{Path.GetFileName(savePath)}' folder.";
+                Dispatcher.Invoke(() => TrayIcon.ShowBalloonTip("Transfer Complete", message, BalloonIcon.Info));
             }
         }
 
