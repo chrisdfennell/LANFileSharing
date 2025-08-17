@@ -1,7 +1,7 @@
 ﻿/* ====================================================================== */
 /* == MainWindow.xaml.cs - The Code-Behind Logic for the Application   == */
 /* ====================================================================== */
-/* This C# code has been updated to fix the reported errors.            */
+/* This C# code has been updated to fix the missing method error.       */
 /* ====================================================================== */
 
 using Hardcodet.Wpf.TaskbarNotification;
@@ -24,7 +24,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 
-namespace LANFileSharing // <-- Make sure this namespace matches your project name
+namespace LANFileSharing
 {
     public class Peer
     {
@@ -37,8 +37,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
     {
         public string FileName { get; set; }
         public string Direction { get; set; }
-        public string FullPath { get; set; } // To store the final path for opening
-        public bool IsFile { get; set; } // To distinguish between a file and a folder transfer
+        public string FullPath { get; set; }
+        public bool IsFile { get; set; }
 
         private string _status;
         public string Status
@@ -104,6 +104,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
         private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
         private SemaphoreSlim transferSemaphore;
         private bool isExiting = false;
+        private Point startPoint; // For drag-drop detection
 
         public MainWindow()
         {
@@ -113,8 +114,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             TransfersList.ItemsSource = activeTransfers;
 
             LoadSettings();
-            ApplyInitialTheme(); // Set the theme on startup
-            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged; // Listen for theme changes
+            ApplyInitialTheme();
+            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
 
             var token = cancellationTokenSource.Token;
             Task.Run(() => StartUdpListener(token));
@@ -124,7 +125,6 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
         private void LoadSettings()
         {
             Properties.Settings.Default.Reload();
-
             savePath = Properties.Settings.Default.SavePath;
             if (string.IsNullOrEmpty(savePath) || !Directory.Exists(savePath))
             {
@@ -132,18 +132,35 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                 Properties.Settings.Default.SavePath = savePath;
                 Properties.Settings.Default.Save();
             }
-
             computerName = Properties.Settings.Default.ComputerName;
             if (string.IsNullOrWhiteSpace(computerName))
             {
                 computerName = Dns.GetHostName();
             }
-
             transferSemaphore = new SemaphoreSlim(Properties.Settings.Default.MaxConcurrentTransfers);
         }
 
+        public void ProcessCommandLineArgs(string[] args)
+        {
+            if (args != null && args.Length > 0)
+            {
+                selectedPaths = args;
+                if (args.Length == 1 && Directory.Exists(args[0]))
+                {
+                    FilePathText.Text = $"Folder: {Path.GetFileName(args[0])}";
+                }
+                else
+                {
+                    FilePathText.Text = $"{args.Length} file(s) selected";
+                }
+                SendButton.IsEnabled = true;
+                SendTabControl.SelectedItem = SendTabControl.Items[0];
+                Log($"{args.Length} item(s) selected via 'Send To' context menu.");
+            }
+        }
+
         // ======================================================================
-        // == UI EVENT HANDLERS (QoL Features)
+        // == UI EVENT HANDLERS
         // ======================================================================
 
         private void Window_StateChanged(object sender, EventArgs e)
@@ -163,10 +180,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             TrayIcon.Visibility = Visibility.Collapsed;
         }
 
-        private void ShowMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            TrayIcon_TrayMouseDoubleClick(sender, e);
-        }
+        private void ShowMenuItem_Click(object sender, RoutedEventArgs e) => TrayIcon_TrayMouseDoubleClick(sender, e);
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
         {
@@ -206,15 +220,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
         {
             if (sender is MenuItem menuItem && menuItem.DataContext is TransferProgress transfer && transfer.IsLink && transfer.IsFile)
             {
-                try
-                {
-                    // UseShellExecute is important for opening files with their default application
-                    Process.Start(new ProcessStartInfo(transfer.FullPath) { UseShellExecute = true });
-                }
-                catch (Exception ex)
-                {
-                    Log($"Error opening file: {ex.Message}");
-                }
+                try { Process.Start(new ProcessStartInfo(transfer.FullPath) { UseShellExecute = true }); }
+                catch (Exception ex) { Log($"Error opening file: {ex.Message}"); }
             }
         }
 
@@ -228,10 +235,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
         private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
         {
-            // This event fires when system settings change, including the app theme.
             if (e.Category == UserPreferenceCategory.General && Properties.Settings.Default.ThemePreference == "Auto")
             {
-                // We need to run this on the UI thread.
                 Dispatcher.Invoke(() => ApplyTheme("Auto"));
             }
         }
@@ -245,11 +250,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
         private void ApplyTheme(string themePreference)
         {
-            string themeToApply = themePreference;
-            if (themePreference == "Auto")
-            {
-                themeToApply = GetWindowsTheme();
-            }
+            string themeToApply = themePreference == "Auto" ? GetWindowsTheme() : themePreference;
             SwitchTheme(themeToApply);
         }
 
@@ -257,24 +258,13 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
         {
             try
             {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"))
+                using (var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"))
                 {
-                    if (key != null)
-                    {
-                        // A value of 1 means light mode, 0 means dark mode.
-                        object registryValue = key.GetValue("AppsUseLightTheme");
-                        if (registryValue is int value)
-                        {
-                            return value > 0 ? "LightTheme" : "DarkTheme";
-                        }
-                    }
+                    if (key?.GetValue("AppsUseLightTheme") is int value)
+                        return value > 0 ? "LightTheme" : "DarkTheme";
                 }
             }
-            catch (Exception ex)
-            {
-                Log($"Could not detect Windows theme: {ex.Message}");
-            }
-            // Default to light theme if detection fails for any reason.
+            catch (Exception ex) { Log($"Could not detect Windows theme: {ex.Message}"); }
             return "LightTheme";
         }
 
@@ -282,16 +272,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
         {
             var dictionaries = Application.Current.Resources.MergedDictionaries;
             var currentTheme = dictionaries.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Theme"));
-
-            if (currentTheme != null)
-            {
-                dictionaries.Remove(currentTheme);
-            }
-
-            dictionaries.Add(new ResourceDictionary
-            {
-                Source = new Uri($"Themes/{themeName}.xaml", UriKind.Relative)
-            });
+            if (currentTheme != null) dictionaries.Remove(currentTheme);
+            dictionaries.Add(new ResourceDictionary { Source = new Uri($"Themes/{themeName}.xaml", UriKind.Relative) });
             Log($"Applied {themeName}");
         }
 
@@ -302,60 +284,55 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             DarkThemeMenuItem.IsChecked = themePreference == "DarkTheme";
         }
 
-        public void ProcessCommandLineArgs(string[] args)
-        {
-            if (args != null && args.Length > 0)
-            {
-                selectedPaths = args;
-
-                // Update UI to reflect the selected files
-                if (args.Length == 1 && Directory.Exists(args[0]))
-                {
-                    FilePathText.Text = $"Folder: {Path.GetFileName(args[0])}";
-                }
-                else
-                {
-                    FilePathText.Text = $"{args.Length} file(s) selected";
-                }
-
-                SendButton.IsEnabled = true;
-                SendTabControl.SelectedItem = SendTabControl.Items[0]; // Switch to the "Files / Folders" tab
-                Log($"{args.Length} item(s) selected via 'Send To' context menu.");
-            }
-        }
-
         // ======================================================================
         // == DRAG & DROP LOGIC
         // ======================================================================
 
         private void Window_DragEnter(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Copy;
-            else e.Effects = DragDropEffects.None;
+            e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
             e.Handled = true;
         }
 
         private void Window_Drop(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            if (e.Data.GetData(DataFormats.FileDrop) is string[] droppedPaths && droppedPaths.Any())
             {
-                string[] droppedPaths = (string[])e.Data.GetData(DataFormats.FileDrop);
-                if (droppedPaths != null && droppedPaths.Length > 0)
+                ProcessCommandLineArgs(droppedPaths);
+            }
+        }
+
+        private void TransfersList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Store the mouse position
+            startPoint = e.GetPosition(null);
+        }
+
+        private void TransfersList_MouseMove(object sender, MouseEventArgs e)
+        {
+            // Get the current mouse position
+            Point mousePos = e.GetPosition(null);
+            Vector diff = startPoint - mousePos;
+
+            if (e.LeftButton == MouseButtonState.Pressed &&
+                (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                 Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance))
+            {
+                // Get the ListView and the item being dragged
+                if (sender is ListView listView && listView.SelectedItem is TransferProgress transfer)
                 {
-                    selectedPaths = droppedPaths;
-
-                    if (droppedPaths.Length == 1 && Directory.Exists(droppedPaths[0])) FilePathText.Text = $"Folder: {Path.GetFileName(droppedPaths[0])}";
-                    else FilePathText.Text = $"{selectedPaths.Length} file(s) selected";
-
-                    SendButton.IsEnabled = true;
-                    SendTabControl.SelectedItem = SendTabControl.Items[0];
-                    Log($"{selectedPaths.Length} item(s) selected via drag and drop.");
+                    // Only allow dragging for completed, received files/folders
+                    if (transfer.IsLink && (File.Exists(transfer.FullPath) || Directory.Exists(transfer.FullPath)))
+                    {
+                        var data = new DataObject(DataFormats.FileDrop, new string[] { transfer.FullPath });
+                        DragDrop.DoDragDrop(listView, data, DragDropEffects.Copy);
+                    }
                 }
             }
         }
 
         // ======================================================================
-        // == UDP DISCOVERY LOGIC
+        // == NETWORK DISCOVERY & TRANSFER LOGIC (UDP/TCP)
         // ======================================================================
 
         private void StartUdpListener(CancellationToken token)
@@ -423,10 +400,6 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             }
         }
 
-        // ======================================================================
-        // == TCP FILE TRANSFER LOGIC
-        // ======================================================================
-
         private void GetLocalIPAddress()
         {
             try
@@ -450,9 +423,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             OpenFileDialog openFileDialog = new OpenFileDialog { Multiselect = true };
             if (openFileDialog.ShowDialog() == true)
             {
-                selectedPaths = openFileDialog.FileNames;
-                FilePathText.Text = $"{selectedPaths.Length} file(s) selected";
-                SendButton.IsEnabled = true;
+                ProcessCommandLineArgs(openFileDialog.FileNames);
             }
         }
 
@@ -461,9 +432,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             var dialog = new VistaFolderBrowserDialog();
             if (dialog.ShowDialog(this).GetValueOrDefault())
             {
-                selectedPaths = new string[] { dialog.SelectedPath };
-                FilePathText.Text = $"Folder: {Path.GetFileName(dialog.SelectedPath)}";
-                SendButton.IsEnabled = true;
+                ProcessCommandLineArgs(new string[] { dialog.SelectedPath });
             }
         }
 
@@ -671,9 +640,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
             foreach (var (name, size) in manifest)
             {
-                var progress = new TransferProgress { FileName = name, Direction = "Receiving", Status = "In Progress" };
+                var progress = new TransferProgress { FileName = name, Direction = "Receiving", Status = "In Progress", IsFile = true };
                 Dispatcher.Invoke(() => activeTransfers.Add(progress));
-                progress.IsFile = true; // Mark as a single file transfer
                 try
                 {
                     var progressReporter = new Progress<(double percentage, double speed)>(p => {
@@ -682,7 +650,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                     });
                     string sanitizedFileName = string.Join("_", name.Split(Path.GetInvalidFileNameChars()));
                     string finalPath = Path.Combine(savePath, sanitizedFileName);
-                    progress.FullPath = finalPath; // Set the full path for the link
+                    progress.FullPath = finalPath;
                     ReceiveStreamToFile(reader, finalPath, size, progressReporter, progress.Cts.Token);
                     Dispatcher.Invoke(() => {
                         progress.Progress = 100;
@@ -706,7 +674,6 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             if (Properties.Settings.Default.ShowReceiveNotification)
             {
                 if (Properties.Settings.Default.PlaySoundOnCompletion) SystemSounds.Asterisk.Play();
-                // Use the less intrusive balloon tip notification instead of a MessageBox
                 string message = $"{fileCount} file(s) received and saved to your '{Path.GetFileName(savePath)}' folder.";
                 Dispatcher.Invoke(() => TrayIcon.ShowBalloonTip("Transfer Complete", message, BalloonIcon.Info));
             }
@@ -728,9 +695,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
             foreach (var (relativePath, size) in manifest)
             {
-                var progress = new TransferProgress { FileName = relativePath, Direction = "Receiving", Status = "In Progress" };
+                var progress = new TransferProgress { FileName = relativePath, Direction = "Receiving", Status = "In Progress", IsFile = false };
                 Dispatcher.Invoke(() => activeTransfers.Add(progress));
-                progress.IsFile = false; // Part of a folder transfer
                 try
                 {
                     var progressReporter = new Progress<(double percentage, double speed)>(p => {
@@ -738,7 +704,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                         progress.Throughput = $"{p.speed:F2} MB/s";
                     });
                     string finalPath = Path.Combine(finalFolderPath, relativePath);
-                    progress.FullPath = finalFolderPath; // Set the full path to the root folder
+                    progress.FullPath = finalFolderPath;
                     Directory.CreateDirectory(Path.GetDirectoryName(finalPath));
                     ReceiveStreamToFile(reader, finalPath, size, progressReporter, progress.Cts.Token);
                     Dispatcher.Invoke(() => {
@@ -762,7 +728,6 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             if (Properties.Settings.Default.ShowReceiveNotification)
             {
                 if (Properties.Settings.Default.PlaySoundOnCompletion) SystemSounds.Asterisk.Play();
-                // Use the less intrusive balloon tip notification instead of a MessageBox
                 string message = $"Folder '{sanitizedRoot}' received and saved to your '{Path.GetFileName(savePath)}' folder.";
                 Dispatcher.Invoke(() => TrayIcon.ShowBalloonTip("Transfer Complete", message, BalloonIcon.Info));
             }
@@ -803,10 +768,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             if (isUrl)
             {
                 Log("Content is a URL, opening in browser.");
-                try
-                {
-                    Process.Start(new ProcessStartInfo(text) { UseShellExecute = true });
-                }
+                try { Process.Start(new ProcessStartInfo(text) { UseShellExecute = true }); }
                 catch (Exception ex)
                 {
                     Log($"Failed to open URL: {ex.Message}");
@@ -828,8 +790,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            var settingsWindow = new SettingsWindow();
-            settingsWindow.Owner = this;
+            var settingsWindow = new SettingsWindow { Owner = this };
             settingsWindow.ShowDialog();
             LoadSettings();
         }
@@ -841,7 +802,6 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
         private void Window_Closing(object sender, CancelEventArgs e)
         {
-            // Unsubscribe from the event to prevent memory leaks
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
 
             if (Properties.Settings.Default.MinimizeToTray && !isExiting)
@@ -849,14 +809,30 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                 e.Cancel = true;
                 this.Hide();
                 TrayIcon.Visibility = Visibility.Visible;
+                return;
             }
-            else
+
+            // Confirmation Before Exiting
+            if (activeTransfers.Any(t => t.IsInProgress))
             {
-                cancellationTokenSource.Cancel();
-                udpListener?.Close();
-                tcpListener?.Stop();
-                TrayIcon.Dispose();
+                var result = MessageBox.Show(
+                    "You have active transfers in progress. Are you sure you want to exit?",
+                    "Confirm Exit",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (result == MessageBoxResult.No)
+                {
+                    e.Cancel = true;
+                    isExiting = false; // Reset the flag if the user cancels the exit
+                    return;
+                }
             }
+
+            cancellationTokenSource.Cancel();
+            udpListener?.Close();
+            tcpListener?.Stop();
+            TrayIcon.Dispose();
         }
 
         private void StopTransferButton_Click(object sender, RoutedEventArgs e)
@@ -875,12 +851,10 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                 {
                     if (File.Exists(transfer.FullPath))
                     {
-                        // Open the folder and select the file
                         Process.Start("explorer.exe", $"/select,\"{transfer.FullPath}\"");
                     }
                     else if (Directory.Exists(transfer.FullPath))
                     {
-                        // Open the folder itself
                         Process.Start("explorer.exe", $"\"{transfer.FullPath}\"");
                     }
                 }
@@ -892,3 +866,4 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
         }
     }
 }
+

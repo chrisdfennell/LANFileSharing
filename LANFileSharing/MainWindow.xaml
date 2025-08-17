@@ -85,7 +85,6 @@
     </Window.Resources>
 
     <Grid>
-        <!-- Root grid definitions MUST be first -->
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="280"/>
             <ColumnDefinition Width="*"/>
@@ -96,7 +95,6 @@
             <RowDefinition Height="200"/>
         </Grid.RowDefinitions>
 
-        <!-- System Tray Icon (child content comes after definitions) -->
         <tb:TaskbarIcon x:Name="TrayIcon"
                         IconSource="/assets/Icon.ico" 
                         ToolTipText="LAN File Sharer"
@@ -116,12 +114,10 @@
             </tb:TaskbarIcon.ContextMenu>
         </tb:TaskbarIcon>
 
-        <!-- Header -->
         <Border Grid.ColumnSpan="2" Grid.Row="0" 
                 Background="{DynamicResource PrimaryBackgroundBrush}" Padding="20" 
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
             <Grid>
-                <!-- Inner grid definitions first -->
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -141,7 +137,6 @@
             </Grid>
         </Border>
 
-        <!-- Left Panel: Discovery -->
         <Border Grid.Column="0" Grid.Row="1" 
                 Background="{DynamicResource SecondaryBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" 
                 BorderThickness="0,0,1,0" Padding="15">
@@ -210,7 +205,6 @@
             </Grid>
         </Border>
 
-        <!-- Right Panel: Send Area -->
         <Border Grid.Column="1" Grid.Row="1" Background="{DynamicResource PrimaryBackgroundBrush}" Padding="25">
             <StackPanel>
                 <TextBlock Text="Send Content" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,0,10"/>
@@ -250,7 +244,6 @@
             </StackPanel>
         </Border>
 
-        <!-- Splitter between middle area and bottom logs -->
         <GridSplitter Grid.Row="1"
                       Grid.ColumnSpan="2"
                       Height="5"
@@ -258,7 +251,6 @@
                       VerticalAlignment="Bottom"
                       Background="Transparent"/>
 
-        <!-- Bottom Panel: Transfers and Status Log -->
         <TabControl Grid.ColumnSpan="2" Grid.Row="2">
             <TabItem>
                 <TabItem.Header>
@@ -274,20 +266,16 @@
                     </StackPanel>
                 </TabItem.Header>
 
-                <ListView x:Name="TransfersList">
-                    <!-- The ContextMenu is now here, directly on the ListView -->
+                <ListView x:Name="TransfersList"
+                          PreviewMouseLeftButtonDown="TransfersList_PreviewMouseLeftButtonDown"
+                          MouseMove="TransfersList_MouseMove">
+
                     <ListView.ContextMenu>
-                        <!-- 
-                        The DataContext is bound to the currently selected item in the ListView.
-                        This allows the MenuItems inside to bind to properties of the TransferProgress object.
-                        -->
                         <ContextMenu DataContext="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource Self}}">
                             <ContextMenu.Style>
                                 <Style TargetType="ContextMenu">
-                                    <!-- The menu is disabled by default -->
                                     <Setter Property="IsEnabled" Value="False" />
                                     <Style.Triggers>
-                                        <!-- It only becomes enabled if the selected item is a completed, received transfer -->
                                         <DataTrigger Binding="{Binding IsLink}" Value="True">
                                             <Setter Property="IsEnabled" Value="True" />
                                         </DataTrigger>
@@ -299,7 +287,6 @@
                         </ContextMenu>
                     </ListView.ContextMenu>
 
-                    <!-- The ItemContainerStyle no longer contains the ContextMenu -->
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem" />
                     </ListView.ItemContainerStyle>
@@ -309,7 +296,6 @@
                             <GridViewColumn Header="File Name" Width="250">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <!-- Click wired here; enabled only when IsLink == true -->
                                         <TextBlock Text="{Binding FileName}"
                                                    MouseLeftButtonUp="FileName_MouseLeftButtonUp">
                                             <TextBlock.Style>
