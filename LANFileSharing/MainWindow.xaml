@@ -1,7 +1,7 @@
 ﻿<!-- ====================================================================== -->
 <!-- == MainWindow.xaml - The User Interface for the WPF Application     == -->
 <!-- ====================================================================== -->
-<!-- This XAML has been updated to add a "Browse Folder..." button.       -->
+<!-- This XAML has been updated to add a throughput column.               -->
 <!-- ====================================================================== -->
 
 <Window x:Class="LANFileSharing.MainWindow"
@@ -11,7 +11,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LANFileSharing"
         mc:Ignorable="d"
-        Title="WPF LAN File Sharer" Height="700" Width="900" MinWidth="800" MinHeight="600"
+        Title="LAN File Sharer" Height="700" Width="950" MinWidth="800" MinHeight="600"
         Background="#F0F2F5"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing"
@@ -59,6 +59,27 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Background" Value="#D1D1D1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Stop Button Style -->
+        <Style TargetType="Button" x:Key="StopButton" BasedOn="{StaticResource ModernButton}">
+            <Setter Property="Background" Value="#D11A2A"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#B21623"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -185,21 +206,27 @@
         <GridSplitter Grid.Row="1" Grid.Column="2" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Background="Transparent"/>
         <TabControl Grid.ColumnSpan="2" Grid.Row="2">
             <TabItem Header="Transfers">
-                <ListView x:Name="TransfersList" Padding="0">
+                <ListView x:Name="TransfersList">
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Header="File Name" Width="300" DisplayMemberBinding="{Binding FileName}"/>
-                            <GridViewColumn Header="Direction" Width="100" DisplayMemberBinding="{Binding Direction}"/>
-                            <GridViewColumn Header="Status" Width="150" DisplayMemberBinding="{Binding Status}"/>
-                            <GridViewColumn Header="Progress" Width="250">
-                                <!-- Increased width for better visibility -->
+                            <GridViewColumn Header="File Name" Width="250" DisplayMemberBinding="{Binding FileName}"/>
+                            <GridViewColumn Header="Direction" Width="80" DisplayMemberBinding="{Binding Direction}"/>
+                            <GridViewColumn Header="Status" Width="120" DisplayMemberBinding="{Binding Status}"/>
+                            <GridViewColumn Header="Progress" Width="200">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <Grid>
-                                            <ProgressBar Value="{Binding Progress}" Maximum="100" Height="18" 
-                                                        HorizontalAlignment="Stretch" VerticalAlignment="Center" 
-                                                        Margin="0" MinWidth="200"/>
+                                            <ProgressBar Value="{Binding Progress}" Maximum="100" Height="18" Width="200"/>
+                                            <TextBlock Text="{Binding Progress, StringFormat={}{0:0}%}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Black" FontSize="12"/>
                                         </Grid>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn Header="Throughput" Width="120" DisplayMemberBinding="{Binding Throughput}"/>
+                            <GridViewColumn Header="Actions" Width="100">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="Stop" Style="{StaticResource StopButton}" Click="StopTransferButton_Click" IsEnabled="{Binding IsInProgress}"/>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>

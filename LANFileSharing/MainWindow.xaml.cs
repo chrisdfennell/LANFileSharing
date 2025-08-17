@@ -1,8 +1,7 @@
 ﻿/* ====================================================================== */
 /* == MainWindow.xaml.cs - The Code-Behind Logic for the Application   == */
 /* ====================================================================== */
-/* This C# code has been updated with a more robust progress reporting  */
-/* mechanism to fix the progress bar issue.                             */
+/* This C# code has been updated to add a throughput display.           */
 /* ====================================================================== */
 
 using Microsoft.Win32;
@@ -35,18 +34,35 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
     {
         public string FileName { get; set; }
         public string Direction { get; set; } // "Sending" or "Receiving"
+
         private string _status;
         public string Status
         {
             get => _status;
-            set { _status = value; OnPropertyChanged(nameof(Status)); }
+            set
+            {
+                _status = value;
+                OnPropertyChanged(nameof(Status));
+                OnPropertyChanged(nameof(IsInProgress));
+            }
         }
+
         private double _progress;
         public double Progress
         {
             get => _progress;
             set { _progress = value; OnPropertyChanged(nameof(Progress)); }
         }
+
+        private string _throughput;
+        public string Throughput
+        {
+            get => _throughput;
+            set { _throughput = value; OnPropertyChanged(nameof(Throughput)); }
+        }
+
+        public bool IsInProgress => Status == "In Progress";
+        public CancellationTokenSource Cts { get; } = new CancellationTokenSource();
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string name)
@@ -55,7 +71,6 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
         }
     }
 
-    // Enum to define the type of content being sent
     public enum ContentType : byte
     {
         Files = 0x01,
@@ -65,7 +80,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
     public partial class MainWindow : Window
     {
-        private string[] selectedPaths = Array.Empty<string>(); // Can be files or a folder
+        private string[] selectedPaths = Array.Empty<string>();
         private const int TcpPort = 8888;
         private const int UdpPort = 8889;
         private string savePath;
@@ -122,14 +137,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
         private void Window_DragEnter(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
-                e.Effects = DragDropEffects.Copy;
-            }
-            else
-            {
-                e.Effects = DragDropEffects.None;
-            }
+            if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Copy;
+            else e.Effects = DragDropEffects.None;
             e.Handled = true;
         }
 
@@ -142,14 +151,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                 {
                     selectedPaths = droppedPaths;
 
-                    if (droppedPaths.Length == 1 && Directory.Exists(droppedPaths[0]))
-                    {
-                        FilePathText.Text = $"Folder: {Path.GetFileName(droppedPaths[0])}";
-                    }
-                    else
-                    {
-                        FilePathText.Text = $"{selectedPaths.Length} file(s) selected";
-                    }
+                    if (droppedPaths.Length == 1 && Directory.Exists(droppedPaths[0])) FilePathText.Text = $"Folder: {Path.GetFileName(droppedPaths[0])}";
+                    else FilePathText.Text = $"{selectedPaths.Length} file(s) selected";
 
                     SendButton.IsEnabled = true;
                     SendTabControl.SelectedItem = SendTabControl.Items[0];
@@ -189,7 +192,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                         }
                         else if (parts[0] == "RESPONSE")
                         {
-                            Dispatcher.BeginInvoke(() => {
+                            Dispatcher.Invoke(() => {
                                 if (!discoveredPeers.Any(p => p.IpAddress == result.RemoteEndPoint.Address.ToString()))
                                 {
                                     discoveredPeers.Add(new Peer { HostName = parts[1], IpAddress = result.RemoteEndPoint.Address.ToString() });
@@ -320,13 +323,25 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                         foreach (var file in allFiles)
                         {
                             var progress = new TransferProgress { FileName = Path.GetFileName(file), Direction = "Sending", Status = "In Progress" };
-                            Dispatcher.BeginInvoke(() => activeTransfers.Add(progress));
-                            var progressReporter = new Progress<double>(p => { progress.Progress = p; Log($"Progress updated to {p}% for {progress.FileName}"); });
-                            SendStreamWithProgress(writer.BaseStream, file, progressReporter);
-                            Dispatcher.BeginInvoke(() => {
-                                progress.Progress = 100;
-                                progress.Status = "Complete";
-                            });
+                            Dispatcher.Invoke(() => activeTransfers.Add(progress));
+                            try
+                            {
+                                var progressReporter = new Progress<(double percentage, double speed)>(p => {
+                                    progress.Progress = p.percentage;
+                                    progress.Throughput = $"{p.speed:F2} MB/s";
+                                });
+                                SendStreamWithProgress(writer.BaseStream, file, progressReporter, progress.Cts.Token);
+                                Dispatcher.Invoke(() => {
+                                    progress.Progress = 100;
+                                    progress.Status = "Complete";
+                                    progress.Throughput = "";
+                                });
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                Dispatcher.Invoke(() => progress.Status = "Cancelled");
+                                Log($"Send cancelled for {progress.FileName}");
+                            }
                         }
                     }
                     else
@@ -344,32 +359,49 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                         foreach (var path in paths)
                         {
                             var progress = new TransferProgress { FileName = Path.GetFileName(path), Direction = "Sending", Status = "In Progress" };
-                            Dispatcher.BeginInvoke(() => activeTransfers.Add(progress));
-                            var progressReporter = new Progress<double>(p => progress.Progress = p);
-                            SendStreamWithProgress(writer.BaseStream, path, progressReporter);
-                            Dispatcher.BeginInvoke(() => {
-                                progress.Progress = 100;
-                                progress.Status = "Complete";
-                            });
+                            Dispatcher.Invoke(() => activeTransfers.Add(progress));
+                            try
+                            {
+                                var progressReporter = new Progress<(double percentage, double speed)>(p => {
+                                    progress.Progress = p.percentage;
+                                    progress.Throughput = $"{p.speed:F2} MB/s";
+                                });
+                                SendStreamWithProgress(writer.BaseStream, path, progressReporter, progress.Cts.Token);
+                                Dispatcher.Invoke(() => {
+                                    progress.Progress = 100;
+                                    progress.Status = "Complete";
+                                    progress.Throughput = "";
+                                });
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                Dispatcher.Invoke(() => progress.Status = "Cancelled");
+                                Log($"Send cancelled for {progress.FileName}");
+                            }
                         }
                     }
                 }
             }
         }
 
-        private void SendStreamWithProgress(Stream networkStream, string filePath, IProgress<double> progress)
+        private void SendStreamWithProgress(Stream networkStream, string filePath, IProgress<(double, double)> progress, CancellationToken token)
         {
             using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
             {
                 byte[] buffer = new byte[8192];
                 int bytesRead;
                 long totalBytesSent = 0;
+                var stopwatch = Stopwatch.StartNew();
+
                 while ((bytesRead = fileStream.Read(buffer, 0, buffer.Length)) > 0)
                 {
+                    token.ThrowIfCancellationRequested();
                     networkStream.Write(buffer, 0, bytesRead);
                     totalBytesSent += bytesRead;
-                    double currentProgress = (double)totalBytesSent / fileStream.Length * 100;
-                    progress.Report(currentProgress); // Report every change
+
+                    double percentage = (double)totalBytesSent / fileStream.Length * 100;
+                    double speed = totalBytesSent / (1024.0 * 1024.0) / stopwatch.Elapsed.TotalSeconds;
+                    progress.Report((percentage, speed));
                 }
             }
         }
@@ -424,7 +456,10 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                     else if (type == ContentType.Folder) HandleFolderTransfer(reader);
                 }
             }
-            catch (Exception ex) { Log($"Error handling client: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                Log($"Error handling client: {ex.Message}");
+            }
             finally
             {
                 client.Close();
@@ -444,23 +479,38 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             foreach (var (name, size) in manifest)
             {
                 var progress = new TransferProgress { FileName = name, Direction = "Receiving", Status = "In Progress" };
-                Dispatcher.BeginInvoke(() => activeTransfers.Add(progress));
-                var progressReporter = new Progress<double>(p => progress.Progress = p);
-
-                string sanitizedFileName = string.Join("_", name.Split(Path.GetInvalidFileNameChars()));
-                string finalPath = Path.Combine(savePath, sanitizedFileName);
-
-                ReceiveStreamToFile(reader, finalPath, size, progressReporter);
-                Dispatcher.BeginInvoke(() => {
-                    progress.Progress = 100;
-                    progress.Status = "Complete";
-                });
-                Log($"Received '{sanitizedFileName}'");
+                Dispatcher.Invoke(() => activeTransfers.Add(progress));
+                try
+                {
+                    var progressReporter = new Progress<(double percentage, double speed)>(p => {
+                        progress.Progress = p.percentage;
+                        progress.Throughput = $"{p.speed:F2} MB/s";
+                    });
+                    string sanitizedFileName = string.Join("_", name.Split(Path.GetInvalidFileNameChars()));
+                    string finalPath = Path.Combine(savePath, sanitizedFileName);
+                    ReceiveStreamToFile(reader, finalPath, size, progressReporter, progress.Cts.Token);
+                    Dispatcher.Invoke(() => {
+                        progress.Progress = 100;
+                        progress.Status = "Complete";
+                        progress.Throughput = "";
+                    });
+                    Log($"Received '{sanitizedFileName}'");
+                }
+                catch (OperationCanceledException)
+                {
+                    Dispatcher.Invoke(() => progress.Status = "Cancelled");
+                    Log($"Receive cancelled for {progress.FileName}");
+                }
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke(() => progress.Status = "Failed");
+                    Log($"Failed to receive {progress.FileName}: {ex.Message}");
+                }
             }
 
             if (Properties.Settings.Default.ShowReceiveNotification)
             {
-                Dispatcher.BeginInvoke(() => MessageBox.Show($"{fileCount} file(s) received and saved to your '{Path.GetFileName(savePath)}' folder.", "Transfer Complete", MessageBoxButton.OK, MessageBoxImage.Information));
+                Dispatcher.Invoke(() => MessageBox.Show($"{fileCount} file(s) received and saved to your '{Path.GetFileName(savePath)}' folder.", "Transfer Complete", MessageBoxButton.OK, MessageBoxImage.Information));
             }
         }
 
@@ -481,39 +531,60 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             foreach (var (relativePath, size) in manifest)
             {
                 var progress = new TransferProgress { FileName = relativePath, Direction = "Receiving", Status = "In Progress" };
-                Dispatcher.BeginInvoke(() => activeTransfers.Add(progress));
-                var progressReporter = new Progress<double>(p => progress.Progress = p);
-
-                string finalPath = Path.Combine(finalFolderPath, relativePath);
-                Directory.CreateDirectory(Path.GetDirectoryName(finalPath));
-
-                ReceiveStreamToFile(reader, finalPath, size, progressReporter);
-                Dispatcher.BeginInvoke(() => {
-                    progress.Progress = 100;
-                    progress.Status = "Complete";
-                });
+                Dispatcher.Invoke(() => activeTransfers.Add(progress));
+                try
+                {
+                    var progressReporter = new Progress<(double percentage, double speed)>(p => {
+                        progress.Progress = p.percentage;
+                        progress.Throughput = $"{p.speed:F2} MB/s";
+                    });
+                    string finalPath = Path.Combine(finalFolderPath, relativePath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(finalPath));
+                    ReceiveStreamToFile(reader, finalPath, size, progressReporter, progress.Cts.Token);
+                    Dispatcher.Invoke(() => {
+                        progress.Progress = 100;
+                        progress.Status = "Complete";
+                        progress.Throughput = "";
+                    });
+                }
+                catch (OperationCanceledException)
+                {
+                    Dispatcher.Invoke(() => progress.Status = "Cancelled");
+                    Log($"Receive cancelled for {progress.FileName}");
+                }
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke(() => progress.Status = "Failed");
+                    Log($"Failed to receive {progress.FileName}: {ex.Message}");
+                }
             }
 
             if (Properties.Settings.Default.ShowReceiveNotification)
             {
-                Dispatcher.BeginInvoke(() => MessageBox.Show($"Folder '{sanitizedRoot}' received and saved to your '{Path.GetFileName(savePath)}' folder.", "Transfer Complete", MessageBoxButton.OK, MessageBoxImage.Information));
+                Dispatcher.Invoke(() => MessageBox.Show($"Folder '{sanitizedRoot}' received and saved to your '{Path.GetFileName(savePath)}' folder.", "Transfer Complete", MessageBoxButton.OK, MessageBoxImage.Information));
             }
         }
 
-        private void ReceiveStreamToFile(BinaryReader reader, string filePath, long size, IProgress<double> progress)
+        private void ReceiveStreamToFile(BinaryReader reader, string filePath, long size, IProgress<(double, double)> progress, CancellationToken token)
         {
             using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
             {
                 byte[] buffer = new byte[8192];
                 long totalBytesReceived = 0;
+                var stopwatch = Stopwatch.StartNew();
+
                 while (totalBytesReceived < size)
                 {
+                    token.ThrowIfCancellationRequested();
                     int bytesToRead = (int)Math.Min(buffer.Length, size - totalBytesReceived);
                     int bytesRead = reader.Read(buffer, 0, bytesToRead);
+                    if (bytesRead == 0) break;
                     fileStream.Write(buffer, 0, bytesRead);
                     totalBytesReceived += bytesRead;
-                    double currentProgress = (double)totalBytesReceived / size * 100;
-                    progress.Report(currentProgress); // Report every change
+
+                    double percentage = (double)totalBytesReceived / size * 100;
+                    double speed = totalBytesReceived / (1024.0 * 1024.0) / stopwatch.Elapsed.TotalSeconds;
+                    progress.Report((percentage, speed));
                 }
             }
         }
@@ -562,7 +633,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
         private void Log(string message)
         {
-            Dispatcher.BeginInvoke(() => StatusLog.Items.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {message}"));
+            Dispatcher.Invoke(() => StatusLog.Items.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {message}"));
         }
 
         private void Window_Closing(object sender, CancelEventArgs e)
@@ -570,6 +641,14 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             cancellationTokenSource.Cancel();
             udpListener?.Close();
             tcpListener?.Stop();
+        }
+
+        private void StopTransferButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && button.DataContext is TransferProgress transfer)
+            {
+                transfer.Cts.Cancel();
+            }
         }
     }
 }
