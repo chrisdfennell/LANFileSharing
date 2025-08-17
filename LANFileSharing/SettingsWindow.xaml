@@ -1,0 +1,53 @@
+﻿<!-- ====================================================================== -->
+<!-- == SettingsWindow.xaml - The UI for the new Settings Window       == -->
+<!-- ====================================================================== -->
+<!-- Add a new Window to your project and name it SettingsWindow.xaml.    -->
+<!-- Replace its contents with this code.                                 -->
+<!-- ====================================================================== -->
+<Window x:Class="LANFileSharing.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:LANFileSharing"
+        mc:Ignorable="d"
+        Title="Settings" Height="400" Width="600"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="Save Location" FontWeight="SemiBold"/>
+            <TextBlock Text="The folder where incoming files will be saved." Foreground="Gray" Margin="0,2,0,5"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="SavePathTextBox" IsReadOnly="True" Padding="5" VerticalContentAlignment="Center"/>
+                <Button x:Name="BrowseSavePathButton" Content="Browse..." Margin="10,0,0,0" Grid.Column="1" Padding="10,5" Click="BrowseSavePathButton_Click"/>
+            </Grid>
+
+            <TextBlock Text="Computer Name" FontWeight="SemiBold" Margin="0,20,0,0"/>
+            <TextBlock Text="The name that other users will see on the network. Leave blank to use default." Foreground="Gray" Margin="0,2,0,5"/>
+            <TextBox x:Name="ComputerNameTextBox" Padding="5" VerticalContentAlignment="Center"/>
+
+            <TextBlock Text="Notifications" FontWeight="SemiBold" Margin="0,20,0,0"/>
+            <CheckBox x:Name="ShowNotificationCheckBox" Content="Show a pop-up message when a file transfer is complete." Margin="0,5,0,0"/>
+
+            <TextBlock Text="Concurrency" FontWeight="SemiBold" Margin="0,20,0,0"/>
+            <TextBlock Text="The maximum number of files to receive at the same time." Foreground="Gray" Margin="0,2,0,5"/>
+            <Slider x:Name="MaxTransfersSlider" Minimum="1" Maximum="10" IsSnapToTickEnabled="True" TickFrequency="1"/>
+            <TextBlock Text="{Binding ElementName=MaxTransfersSlider, Path=Value, StringFormat={}{0:0}}" HorizontalAlignment="Center" FontWeight="Bold"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="SaveButton" Content="Save" Width="100" Padding="8" Margin="0,0,10,0" IsDefault="True" Click="SaveButton_Click"/>
+            <Button x:Name="CancelButton" Content="Cancel" Width="100" Padding="8" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
