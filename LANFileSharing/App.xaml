@@ -4,6 +4,11 @@
              xmlns:local="clr-namespace:LANFileSharing"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- The default theme loaded at startup -->
+                <ResourceDictionary Source="Themes/LightTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

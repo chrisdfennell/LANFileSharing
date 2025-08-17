@@ -7,7 +7,7 @@
         xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d"
         Title="LAN File Sharer" Height="700" Width="950" MinWidth="800" MinHeight="600"
-        Background="#F0F2F5"
+        Background="{DynamicResource AppBackgroundBrush}"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing"
         AllowDrop="True" DragEnter="Window_DragEnter" Drop="Window_Drop"
@@ -16,8 +16,8 @@
     <Window.Resources>
         <!-- Modern Button Style -->
         <Style TargetType="Button" x:Key="ModernButton">
-            <Setter Property="Background" Value="#0078D7"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{DynamicResource PrimaryButtonBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryButtonForegroundBrush}"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="Padding" Value="12,8"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -30,11 +30,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#005A9E"/>
+                                <Setter Property="Background" Value="{DynamicResource PrimaryButtonHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Background" Value="#A0A0A0"/>
-                                <Setter Property="Foreground" Value="#F0F0F0"/>
+                                <Setter Property="Background" Value="{DynamicResource DisabledButtonBackgroundBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource DisabledForegroundBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -44,17 +44,17 @@
 
         <!-- Secondary Button Style -->
         <Style TargetType="Button" x:Key="SecondaryButton" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Background" Value="#E1E1E1"/>
-            <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="Background" Value="{DynamicResource SecondaryButtonBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryButtonForegroundBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}" CornerRadius="4" BorderBrush="#CCCCCC" BorderThickness="1">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#D1D1D1"/>
+                                <Setter Property="Background" Value="{DynamicResource SecondaryButtonHoverBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -64,7 +64,7 @@
 
         <!-- Stop Button Style -->
         <Style TargetType="Button" x:Key="StopButton" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Background" Value="#D11A2A"/>
+            <Setter Property="Background" Value="{DynamicResource StopButtonBackgroundBrush}"/>
             <Setter Property="Padding" Value="8,4"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
@@ -75,7 +75,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#B21623"/>
+                                <Setter Property="Background" Value="{DynamicResource StopButtonHoverBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -100,17 +100,26 @@
         <tb:TaskbarIcon x:Name="TrayIcon"
                         IconSource="/assets/Icon.ico" 
                         ToolTipText="LAN File Sharer"
-                        TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick">
+                        TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick"
+                        Visibility="Collapsed">
             <tb:TaskbarIcon.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="Show" Click="ShowMenuItem_Click"/>
+                    <MenuItem Header="Theme">
+                        <MenuItem x:Name="AutoThemeMenuItem" Header="Auto (System)" Click="ThemeMenuItem_Click" Tag="Auto"/>
+                        <MenuItem x:Name="LightThemeMenuItem" Header="Light" Click="ThemeMenuItem_Click" Tag="LightTheme"/>
+                        <MenuItem x:Name="DarkThemeMenuItem" Header="Dark" Click="ThemeMenuItem_Click" Tag="DarkTheme"/>
+                    </MenuItem>
+                    <Separator />
                     <MenuItem Header="Exit" Click="ExitMenuItem_Click"/>
                 </ContextMenu>
             </tb:TaskbarIcon.ContextMenu>
         </tb:TaskbarIcon>
 
         <!-- Header -->
-        <Border Grid.ColumnSpan="2" Grid.Row="0" Background="White" Padding="20" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+        <Border Grid.ColumnSpan="2" Grid.Row="0" 
+                Background="{DynamicResource PrimaryBackgroundBrush}" Padding="20" 
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
             <Grid>
                 <!-- Inner grid definitions first -->
                 <Grid.ColumnDefinitions>
@@ -119,8 +128,8 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="LAN File Sharer" FontSize="24" FontWeight="SemiBold" Foreground="#1F2937"/>
-                    <TextBlock x:Name="IpAddressText" Text="Your IP Address: Loading..." FontSize="13" Foreground="#6B7280" Margin="0,4,0,0"/>
+                    <TextBlock Text="LAN File Sharer" FontSize="24" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/>
+                    <TextBlock x:Name="IpAddressText" Text="Your IP Address: Loading..." FontSize="13" Foreground="{DynamicResource SecondaryTextBrush}" Margin="0,4,0,0"/>
                 </StackPanel>
 
                 <Button Grid.Column="1"
@@ -133,7 +142,9 @@
         </Border>
 
         <!-- Left Panel: Discovery -->
-        <Border Grid.Column="0" Grid.Row="1" Background="#F8F9FA" BorderBrush="#E0E0E0" BorderThickness="0,0,1,0" Padding="15">
+        <Border Grid.Column="0" Grid.Row="1" 
+                Background="{DynamicResource SecondaryBackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" 
+                BorderThickness="0,0,1,0" Padding="15">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -141,7 +152,7 @@
                 </Grid.RowDefinitions>
 
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                    <TextBlock Text="Available Devices" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="Available Devices" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}"/>
                     <Button x:Name="DiscoverButton" Click="DiscoverButton_Click" Style="{StaticResource SecondaryButton}" Padding="8,5" Margin="10,0,0,0" Content="Refresh"/>
                 </StackPanel>
 
@@ -166,8 +177,8 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsSelected" Value="true">
-                                                <Setter TargetName="Bd" Property="Background" Value="#CCE4F7"/>
-                                                <Setter TargetName="Bd" Property="BorderBrush" Value="#0078D7"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ListSelectedBackgroundBrush}"/>
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ListSelectedBorderBrush}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -187,8 +198,8 @@
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel>
-                                            <TextBlock Text="{Binding HostName}" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding IpAddress}" Foreground="Gray"/>
+                                            <TextBlock Text="{Binding HostName}" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}"/>
+                                            <TextBlock Text="{Binding IpAddress}" Foreground="{DynamicResource SecondaryTextBrush}"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
@@ -200,14 +211,14 @@
         </Border>
 
         <!-- Right Panel: Send Area -->
-        <Border Grid.Column="1" Grid.Row="1" Background="White" Padding="25">
+        <Border Grid.Column="1" Grid.Row="1" Background="{DynamicResource PrimaryBackgroundBrush}" Padding="25">
             <StackPanel>
-                <TextBlock Text="Send Content" FontSize="20" FontWeight="SemiBold" Foreground="#111827" Margin="0,0,0,10"/>
+                <TextBlock Text="Send Content" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource PrimaryTextBrush}" Margin="0,0,0,10"/>
 
-                <TextBlock Text="1. Select a device from the list on the left" Margin="0,0,0,10" Foreground="#555"/>
-                <TextBox x:Name="TargetIpTextBox" IsReadOnly="True" Background="#F0F2F5" Padding="8" BorderThickness="1" BorderBrush="#CCC" Text="No device selected"/>
+                <TextBlock Text="1. Select a device from the list on the left" Margin="0,0,0,10" Foreground="{DynamicResource MutedTextBrush}"/>
+                <TextBox x:Name="TargetIpTextBox" IsReadOnly="True" Background="{DynamicResource TertiaryBackgroundBrush}" Padding="8" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" Text="No device selected" Foreground="{DynamicResource PrimaryTextBrush}"/>
 
-                <TextBlock Text="2. Choose what to send" Margin="0,20,0,10" Foreground="#555"/>
+                <TextBlock Text="2. Choose what to send" Margin="0,20,0,10" Foreground="{DynamicResource MutedTextBrush}"/>
                 <TabControl x:Name="SendTabControl">
                     <TabItem Header="Files / Folders">
                         <StackPanel Margin="0,15,0,0">
@@ -219,8 +230,9 @@
                                 </Grid.ColumnDefinitions>
                                 <Button x:Name="BrowseFilesButton" Content="Browse Files..." Style="{StaticResource SecondaryButton}" Click="BrowseFilesButton_Click"/>
                                 <Button x:Name="BrowseFolderButton" Content="Browse Folder..." Style="{StaticResource SecondaryButton}" Click="BrowseFolderButton_Click" Margin="5,0,0,0" Grid.Column="1"/>
-                                <Border Grid.Column="2" Background="#F0F2F5" Margin="10,0,0,0" CornerRadius="4" BorderBrush="#CCC" BorderThickness="1">
-                                    <TextBlock x:Name="FilePathText" Text="No content selected (or drag &amp; drop here)" VerticalAlignment="Center" Margin="10,0" Foreground="#6B7280" TextTrimming="CharacterEllipsis"/>
+                                <Border Grid.Column="2" Background="{DynamicResource TertiaryBackgroundBrush}" Margin="10,0,0,0" CornerRadius="4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                                    <TextBlock x:Name="FilePathText" Text="No content selected (or drag &amp; drop here)" VerticalAlignment="Center" Margin="10,0" 
+                                               Foreground="{DynamicResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis"/>
                                 </Border>
                             </Grid>
                             <Button x:Name="SendButton" Content="Send" Style="{StaticResource ModernButton}" Click="SendButton_Click" IsEnabled="False" Margin="0,20,0,0" HorizontalAlignment="Left"/>
@@ -228,7 +240,9 @@
                     </TabItem>
                     <TabItem Header="Text / URL">
                         <StackPanel Margin="0,15,0,0">
-                            <TextBox x:Name="TextToSendBox" Height="100" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Padding="5"/>
+                            <TextBox x:Name="TextToSendBox" Height="100" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Padding="5" 
+                                     Background="{DynamicResource TertiaryBackgroundBrush}" Foreground="{DynamicResource PrimaryTextBrush}" 
+                                     BorderBrush="{DynamicResource BorderBrush}"/>
                             <Button x:Name="SendTextButton" Content="Send Text" Style="{StaticResource ModernButton}" Click="SendTextButton_Click" Margin="0,10,0,0" HorizontalAlignment="Left"/>
                         </StackPanel>
                     </TabItem>
@@ -249,7 +263,7 @@
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="Transfers"/>
+                        <TextBlock Text="Transfers" Foreground="{DynamicResource PrimaryTextBrush}"/>
                         <Button x:Name="ClearCompletedButton"
                                 Content="Clear Completed"
                                 Style="{StaticResource SecondaryButton}"
@@ -261,6 +275,35 @@
                 </TabItem.Header>
 
                 <ListView x:Name="TransfersList">
+                    <!-- The ContextMenu is now here, directly on the ListView -->
+                    <ListView.ContextMenu>
+                        <!-- 
+                        The DataContext is bound to the currently selected item in the ListView.
+                        This allows the MenuItems inside to bind to properties of the TransferProgress object.
+                        -->
+                        <ContextMenu DataContext="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource Self}}">
+                            <ContextMenu.Style>
+                                <Style TargetType="ContextMenu">
+                                    <!-- The menu is disabled by default -->
+                                    <Setter Property="IsEnabled" Value="False" />
+                                    <Style.Triggers>
+                                        <!-- It only becomes enabled if the selected item is a completed, received transfer -->
+                                        <DataTrigger Binding="{Binding IsLink}" Value="True">
+                                            <Setter Property="IsEnabled" Value="True" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ContextMenu.Style>
+                            <MenuItem Header="Open File" Click="OpenFile_Click" IsEnabled="{Binding IsFile}"/>
+                            <MenuItem Header="Open Containing Folder" Click="OpenContainingFolder_Click"/>
+                        </ContextMenu>
+                    </ListView.ContextMenu>
+
+                    <!-- The ItemContainerStyle no longer contains the ContextMenu -->
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem" />
+                    </ListView.ItemContainerStyle>
+
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Header="File Name" Width="250">
@@ -272,12 +315,13 @@
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock">
                                                     <Setter Property="IsHitTestVisible" Value="False"/>
-                                                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"/>
+                                                    <Setter Property="Foreground" 
+                                                            Value="{DynamicResource PrimaryTextBrush}"/>
                                                     <Setter Property="TextDecorations" Value="{x:Null}"/>
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsLink}" Value="True">
                                                             <Setter Property="IsHitTestVisible" Value="True"/>
-                                                            <Setter Property="Foreground" Value="Blue"/>
+                                                            <Setter Property="Foreground" Value="{DynamicResource LinkTextBrush}"/>
                                                             <Setter Property="TextDecorations" Value="Underline"/>
                                                             <Setter Property="Cursor" Value="Hand"/>
                                                         </DataTrigger>
@@ -300,7 +344,7 @@
                                             <TextBlock Text="{Binding Progress, StringFormat={}{0:0}%}"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
-                                                       Foreground="Black"
+                                                       Foreground="{DynamicResource PrimaryButtonForegroundBrush}"
                                                        FontSize="12"/>
                                         </Grid>
                                     </DataTemplate>
@@ -325,7 +369,7 @@
             </TabItem>
 
             <TabItem Header="Status Log">
-                <ListBox x:Name="StatusLog" BorderThickness="0" Background="#FDFDFD" FontFamily="Consolas" FontSize="12"/>
+                <ListBox x:Name="StatusLog" BorderThickness="0" Background="{DynamicResource TextLogBackgroundBrush}" FontFamily="Consolas" FontSize="12" Foreground="{DynamicResource SecondaryTextBrush}"/>
             </TabItem>
         </TabControl>
     </Grid>

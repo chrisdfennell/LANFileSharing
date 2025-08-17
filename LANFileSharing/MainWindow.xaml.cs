@@ -38,6 +38,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
         public string FileName { get; set; }
         public string Direction { get; set; }
         public string FullPath { get; set; } // To store the final path for opening
+        public bool IsFile { get; set; } // To distinguish between a file and a folder transfer
 
         private string _status;
         public string Status
@@ -112,6 +113,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             TransfersList.ItemsSource = activeTransfers;
 
             LoadSettings();
+            ApplyInitialTheme(); // Set the theme on startup
+            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged; // Listen for theme changes
 
             var token = cancellationTokenSource.Token;
             Task.Run(() => StartUdpListener(token));
@@ -175,26 +178,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
         {
             if (sender is TextBlock textBlock && textBlock.DataContext is TransferProgress transfer)
             {
-                if (transfer.IsLink)
-                {
-                    try
-                    {
-                        if (File.Exists(transfer.FullPath))
-                        {
-                            // Open the folder containing the file and select it
-                            Process.Start("explorer.exe", $"/select,\"{transfer.FullPath}\"");
-                        }
-                        else if (Directory.Exists(transfer.FullPath))
-                        {
-                            // Open the folder itself
-                            Process.Start("explorer.exe", transfer.FullPath);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log($"Error opening item: {ex.Message}");
-                    }
-                }
+                OpenItemInExplorer(transfer);
             }
         }
 
@@ -205,6 +189,117 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             {
                 activeTransfers.Remove(item);
             }
+        }
+
+        private void ThemeMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem menuItem && menuItem.Tag is string themePreference)
+            {
+                Properties.Settings.Default.ThemePreference = themePreference;
+                Properties.Settings.Default.Save();
+                ApplyTheme(themePreference);
+                UpdateThemeCheckmarks(themePreference);
+            }
+        }
+
+        private void OpenFile_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem menuItem && menuItem.DataContext is TransferProgress transfer && transfer.IsLink && transfer.IsFile)
+            {
+                try
+                {
+                    // UseShellExecute is important for opening files with their default application
+                    Process.Start(new ProcessStartInfo(transfer.FullPath) { UseShellExecute = true });
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error opening file: {ex.Message}");
+                }
+            }
+        }
+
+        private void OpenContainingFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem menuItem && menuItem.DataContext is TransferProgress transfer)
+            {
+                OpenItemInExplorer(transfer);
+            }
+        }
+
+        private void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+        {
+            // This event fires when system settings change, including the app theme.
+            if (e.Category == UserPreferenceCategory.General && Properties.Settings.Default.ThemePreference == "Auto")
+            {
+                // We need to run this on the UI thread.
+                Dispatcher.Invoke(() => ApplyTheme("Auto"));
+            }
+        }
+
+        private void ApplyInitialTheme()
+        {
+            string themePreference = Properties.Settings.Default.ThemePreference;
+            ApplyTheme(themePreference);
+            UpdateThemeCheckmarks(themePreference);
+        }
+
+        private void ApplyTheme(string themePreference)
+        {
+            string themeToApply = themePreference;
+            if (themePreference == "Auto")
+            {
+                themeToApply = GetWindowsTheme();
+            }
+            SwitchTheme(themeToApply);
+        }
+
+        private string GetWindowsTheme()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"))
+                {
+                    if (key != null)
+                    {
+                        // A value of 1 means light mode, 0 means dark mode.
+                        object registryValue = key.GetValue("AppsUseLightTheme");
+                        if (registryValue is int value)
+                        {
+                            return value > 0 ? "LightTheme" : "DarkTheme";
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not detect Windows theme: {ex.Message}");
+            }
+            // Default to light theme if detection fails for any reason.
+            return "LightTheme";
+        }
+
+        private void SwitchTheme(string themeName)
+        {
+            var dictionaries = Application.Current.Resources.MergedDictionaries;
+            var currentTheme = dictionaries.FirstOrDefault(d => d.Source != null && d.Source.OriginalString.Contains("Theme"));
+
+            if (currentTheme != null)
+            {
+                dictionaries.Remove(currentTheme);
+            }
+
+            dictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri($"Themes/{themeName}.xaml", UriKind.Relative)
+            });
+            Log($"Applied {themeName}");
+        }
+
+        private void UpdateThemeCheckmarks(string themePreference)
+        {
+            AutoThemeMenuItem.IsChecked = themePreference == "Auto";
+            LightThemeMenuItem.IsChecked = themePreference == "LightTheme";
+            DarkThemeMenuItem.IsChecked = themePreference == "DarkTheme";
         }
 
         // ======================================================================
@@ -556,6 +651,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             {
                 var progress = new TransferProgress { FileName = name, Direction = "Receiving", Status = "In Progress" };
                 Dispatcher.Invoke(() => activeTransfers.Add(progress));
+                progress.IsFile = true; // Mark as a single file transfer
                 try
                 {
                     var progressReporter = new Progress<(double percentage, double speed)>(p => {
@@ -610,6 +706,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             {
                 var progress = new TransferProgress { FileName = relativePath, Direction = "Receiving", Status = "In Progress" };
                 Dispatcher.Invoke(() => activeTransfers.Add(progress));
+                progress.IsFile = false; // Part of a folder transfer
                 try
                 {
                     var progressReporter = new Progress<(double percentage, double speed)>(p => {
@@ -718,6 +815,9 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
         private void Window_Closing(object sender, CancelEventArgs e)
         {
+            // Unsubscribe from the event to prevent memory leaks
+            SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+
             if (Properties.Settings.Default.MinimizeToTray && !isExiting)
             {
                 e.Cancel = true;
@@ -738,6 +838,30 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             if (sender is Button button && button.DataContext is TransferProgress transfer)
             {
                 transfer.Cts.Cancel();
+            }
+        }
+
+        private void OpenItemInExplorer(TransferProgress transfer)
+        {
+            if (transfer.IsLink)
+            {
+                try
+                {
+                    if (File.Exists(transfer.FullPath))
+                    {
+                        // Open the folder and select the file
+                        Process.Start("explorer.exe", $"/select,\"{transfer.FullPath}\"");
+                    }
+                    else if (Directory.Exists(transfer.FullPath))
+                    {
+                        // Open the folder itself
+                        Process.Start("explorer.exe", $"\"{transfer.FullPath}\"");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"Error opening item: {ex.Message}");
+                }
             }
         }
     }

@@ -26,5 +26,8 @@
     <Setting Name="AutoRefreshIntervalSeconds" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">10</Value>
     </Setting>
+    <Setting Name="ThemePreference" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Auto</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
