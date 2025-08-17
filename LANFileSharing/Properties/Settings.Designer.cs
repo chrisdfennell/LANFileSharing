@@ -70,5 +70,53 @@ namespace LANFileSharing.Properties {
                 this["MaxConcurrentTransfers"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool MinimizeToTray {
+            get {
+                return ((bool)(this["MinimizeToTray"]));
+            }
+            set {
+                this["MinimizeToTray"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool AutoRefreshEnabled {
+            get {
+                return ((bool)(this["AutoRefreshEnabled"]));
+            }
+            set {
+                this["AutoRefreshEnabled"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool PlaySoundOnCompletion {
+            get {
+                return ((bool)(this["PlaySoundOnCompletion"]));
+            }
+            set {
+                this["PlaySoundOnCompletion"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("10")]
+        public int AutoRefreshIntervalSeconds {
+            get {
+                return ((int)(this["AutoRefreshIntervalSeconds"]));
+            }
+            set {
+                this["AutoRefreshIntervalSeconds"] = value;
+            }
+        }
     }
 }

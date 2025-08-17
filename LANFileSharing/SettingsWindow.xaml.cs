@@ -1,8 +1,7 @@
 ﻿/* ====================================================================== */
 /* == SettingsWindow.xaml.cs - The Logic for the new Settings Window   == */
 /* ====================================================================== */
-/* Add a new Window to your project and name it SettingsWindow.xaml.    */
-/* Replace the contents of its .cs file with this code.                 */
+/* This C# code has been updated to handle the new QoL settings.        */
 /* ====================================================================== */
 using System.Windows;
 using Ookii.Dialogs.Wpf;
@@ -22,6 +21,10 @@ namespace LANFileSharing
             SavePathTextBox.Text = Properties.Settings.Default.SavePath;
             ComputerNameTextBox.Text = Properties.Settings.Default.ComputerName;
             ShowNotificationCheckBox.IsChecked = Properties.Settings.Default.ShowReceiveNotification;
+            PlaySoundCheckBox.IsChecked = Properties.Settings.Default.PlaySoundOnCompletion;
+            MinimizeToTrayCheckBox.IsChecked = Properties.Settings.Default.MinimizeToTray;
+            AutoRefreshCheckBox.IsChecked = Properties.Settings.Default.AutoRefreshEnabled;
+            AutoRefreshIntervalSlider.Value = Properties.Settings.Default.AutoRefreshIntervalSeconds;
             MaxTransfersSlider.Value = Properties.Settings.Default.MaxConcurrentTransfers;
         }
 
@@ -30,6 +33,10 @@ namespace LANFileSharing
             Properties.Settings.Default.SavePath = SavePathTextBox.Text;
             Properties.Settings.Default.ComputerName = ComputerNameTextBox.Text;
             Properties.Settings.Default.ShowReceiveNotification = ShowNotificationCheckBox.IsChecked.GetValueOrDefault(true);
+            Properties.Settings.Default.PlaySoundOnCompletion = PlaySoundCheckBox.IsChecked.GetValueOrDefault(true);
+            Properties.Settings.Default.MinimizeToTray = MinimizeToTrayCheckBox.IsChecked.GetValueOrDefault(true);
+            Properties.Settings.Default.AutoRefreshEnabled = AutoRefreshCheckBox.IsChecked.GetValueOrDefault(true);
+            Properties.Settings.Default.AutoRefreshIntervalSeconds = (int)AutoRefreshIntervalSlider.Value;
             Properties.Settings.Default.MaxConcurrentTransfers = (int)MaxTransfersSlider.Value;
 
             Properties.Settings.Default.Save();

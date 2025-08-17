@@ -1,8 +1,7 @@
 ﻿<!-- ====================================================================== -->
 <!-- == SettingsWindow.xaml - The UI for the new Settings Window       == -->
 <!-- ====================================================================== -->
-<!-- Add a new Window to your project and name it SettingsWindow.xaml.    -->
-<!-- Replace its contents with this code.                                 -->
+<!-- This XAML has been updated with the new QoL settings.                -->
 <!-- ====================================================================== -->
 <Window x:Class="LANFileSharing.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -11,7 +10,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LANFileSharing"
         mc:Ignorable="d"
-        Title="Settings" Height="400" Width="600"
+        Title="Settings" Height="500" Width="600"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize">
     <Grid Margin="20">
@@ -38,6 +37,17 @@
 
             <TextBlock Text="Notifications" FontWeight="SemiBold" Margin="0,20,0,0"/>
             <CheckBox x:Name="ShowNotificationCheckBox" Content="Show a pop-up message when a file transfer is complete." Margin="0,5,0,0"/>
+            <CheckBox x:Name="PlaySoundCheckBox" Content="Play a sound when a file transfer is complete." Margin="0,5,0,0"/>
+
+            <TextBlock Text="Behavior" FontWeight="SemiBold" Margin="0,20,0,0"/>
+            <CheckBox x:Name="MinimizeToTrayCheckBox" Content="Minimize to system tray instead of taskbar." Margin="0,5,0,0"/>
+
+            <TextBlock Text="Discovery" FontWeight="SemiBold" Margin="0,20,0,0"/>
+            <CheckBox x:Name="AutoRefreshCheckBox" Content="Automatically search for new devices on the network." Margin="0,5,0,0"/>
+            <TextBlock Text="Auto-Refresh Interval (seconds)" Foreground="Gray" Margin="0,2,0,5"/>
+            <Slider x:Name="AutoRefreshIntervalSlider" Minimum="5" Maximum="60" IsSnapToTickEnabled="True" TickFrequency="5" Value="10"/>
+            <TextBlock Text="{Binding ElementName=AutoRefreshIntervalSlider, Path=Value, StringFormat={}{0:0} seconds}" HorizontalAlignment="Center" FontWeight="Bold"/>
+
 
             <TextBlock Text="Concurrency" FontWeight="SemiBold" Margin="0,20,0,0"/>
             <TextBlock Text="The maximum number of files to receive at the same time." Foreground="Gray" Margin="0,2,0,5"/>

@@ -1,21 +1,17 @@
-﻿<!-- ====================================================================== -->
-<!-- == MainWindow.xaml - The User Interface for the WPF Application     == -->
-<!-- ====================================================================== -->
-<!-- This XAML has been updated to add a throughput column.               -->
-<!-- ====================================================================== -->
-
-<Window x:Class="LANFileSharing.MainWindow"
+﻿<Window x:Class="LANFileSharing.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LANFileSharing"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
         mc:Ignorable="d"
         Title="LAN File Sharer" Height="700" Width="950" MinWidth="800" MinHeight="600"
         Background="#F0F2F5"
         WindowStartupLocation="CenterScreen"
         Closing="Window_Closing"
-        AllowDrop="True" DragEnter="Window_DragEnter" Drop="Window_Drop">
+        AllowDrop="True" DragEnter="Window_DragEnter" Drop="Window_Drop"
+        StateChanged="Window_StateChanged">
 
     <Window.Resources>
         <!-- Modern Button Style -->
@@ -89,6 +85,7 @@
     </Window.Resources>
 
     <Grid>
+        <!-- Root grid definitions MUST be first -->
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="280"/>
             <ColumnDefinition Width="*"/>
@@ -99,14 +96,39 @@
             <RowDefinition Height="200"/>
         </Grid.RowDefinitions>
 
+        <!-- System Tray Icon (child content comes after definitions) -->
+        <tb:TaskbarIcon x:Name="TrayIcon"
+                        IconSource="/assets/Icon.ico" 
+                        ToolTipText="LAN File Sharer"
+                        TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Show" Click="ShowMenuItem_Click"/>
+                    <MenuItem Header="Exit" Click="ExitMenuItem_Click"/>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+
         <!-- Header -->
         <Border Grid.ColumnSpan="2" Grid.Row="0" Background="White" Padding="20" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
             <Grid>
-                <StackPanel>
+                <!-- Inner grid definitions first -->
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0">
                     <TextBlock Text="LAN File Sharer" FontSize="24" FontWeight="SemiBold" Foreground="#1F2937"/>
                     <TextBlock x:Name="IpAddressText" Text="Your IP Address: Loading..." FontSize="13" Foreground="#6B7280" Margin="0,4,0,0"/>
                 </StackPanel>
-                <Button x:Name="SettingsButton" Content="Settings" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Right" VerticalAlignment="Center" Click="SettingsButton_Click"/>
+
+                <Button Grid.Column="1"
+                        x:Name="SettingsButton"
+                        Content="Settings"
+                        Style="{StaticResource SecondaryButton}"
+                        VerticalAlignment="Center"
+                        Click="SettingsButton_Click"/>
             </Grid>
         </Border>
 
@@ -117,18 +139,29 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
+
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
                     <TextBlock Text="Available Devices" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     <Button x:Name="DiscoverButton" Click="DiscoverButton_Click" Style="{StaticResource SecondaryButton}" Padding="8,5" Margin="10,0,0,0" Content="Refresh"/>
                 </StackPanel>
 
-                <ListView x:Name="DiscoveredPeersList" Grid.Row="1" SelectionChanged="DiscoveredPeersList_SelectionChanged" BorderThickness="0" Background="Transparent">
+                <ListView x:Name="DiscoveredPeersList"
+                          Grid.Row="1"
+                          SelectionChanged="DiscoveredPeersList_SelectionChanged"
+                          BorderThickness="0"
+                          Background="Transparent">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListViewItem">
-                                        <Border x:Name="Bd" BorderBrush="Transparent" BorderThickness="1" Background="{TemplateBinding Background}" Padding="10" CornerRadius="4" Margin="0,2">
+                                        <Border x:Name="Bd"
+                                                BorderBrush="Transparent"
+                                                BorderThickness="1"
+                                                Background="{TemplateBinding Background}"
+                                                Padding="10"
+                                                CornerRadius="4"
+                                                Margin="0,2">
                                             <ContentPresenter/>
                                         </Border>
                                         <ControlTemplate.Triggers>
@@ -142,6 +175,7 @@
                             </Setter>
                         </Style>
                     </ListView.ItemContainerStyle>
+
                     <ListView.View>
                         <GridView>
                             <GridView.ColumnHeaderContainerStyle>
@@ -202,31 +236,86 @@
             </StackPanel>
         </Border>
 
+        <!-- Splitter between middle area and bottom logs -->
+        <GridSplitter Grid.Row="1"
+                      Grid.ColumnSpan="2"
+                      Height="5"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Bottom"
+                      Background="Transparent"/>
+
         <!-- Bottom Panel: Transfers and Status Log -->
-        <GridSplitter Grid.Row="1" Grid.Column="2" Height="5" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Background="Transparent"/>
         <TabControl Grid.ColumnSpan="2" Grid.Row="2">
-            <TabItem Header="Transfers">
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Transfers"/>
+                        <Button x:Name="ClearCompletedButton"
+                                Content="Clear Completed"
+                                Style="{StaticResource SecondaryButton}"
+                                Padding="5,2"
+                                FontSize="10"
+                                Margin="10,0,0,0"
+                                Click="ClearCompletedButton_Click"/>
+                    </StackPanel>
+                </TabItem.Header>
+
                 <ListView x:Name="TransfersList">
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Header="File Name" Width="250" DisplayMemberBinding="{Binding FileName}"/>
+                            <GridViewColumn Header="File Name" Width="250">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <!-- Click wired here; enabled only when IsLink == true -->
+                                        <TextBlock Text="{Binding FileName}"
+                                                   MouseLeftButtonUp="FileName_MouseLeftButtonUp">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="IsHitTestVisible" Value="False"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"/>
+                                                    <Setter Property="TextDecorations" Value="{x:Null}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsLink}" Value="True">
+                                                            <Setter Property="IsHitTestVisible" Value="True"/>
+                                                            <Setter Property="Foreground" Value="Blue"/>
+                                                            <Setter Property="TextDecorations" Value="Underline"/>
+                                                            <Setter Property="Cursor" Value="Hand"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+
                             <GridViewColumn Header="Direction" Width="80" DisplayMemberBinding="{Binding Direction}"/>
                             <GridViewColumn Header="Status" Width="120" DisplayMemberBinding="{Binding Status}"/>
+
                             <GridViewColumn Header="Progress" Width="200">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <Grid>
                                             <ProgressBar Value="{Binding Progress}" Maximum="100" Height="18" Width="200"/>
-                                            <TextBlock Text="{Binding Progress, StringFormat={}{0:0}%}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="Black" FontSize="12"/>
+                                            <TextBlock Text="{Binding Progress, StringFormat={}{0:0}%}"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="Black"
+                                                       FontSize="12"/>
                                         </Grid>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
+
                             <GridViewColumn Header="Throughput" Width="120" DisplayMemberBinding="{Binding Throughput}"/>
+
                             <GridViewColumn Header="Actions" Width="100">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Button Content="Stop" Style="{StaticResource StopButton}" Click="StopTransferButton_Click" IsEnabled="{Binding IsInProgress}"/>
+                                        <Button Content="Stop"
+                                                Style="{StaticResource StopButton}"
+                                                Click="StopTransferButton_Click"
+                                                IsEnabled="{Binding IsInProgress}"/>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
@@ -234,6 +323,7 @@
                     </ListView.View>
                 </ListView>
             </TabItem>
+
             <TabItem Header="Status Log">
                 <ListBox x:Name="StatusLog" BorderThickness="0" Background="#FDFDFD" FontFamily="Consolas" FontSize="12"/>
             </TabItem>

@@ -1,10 +1,12 @@
 ﻿/* ====================================================================== */
 /* == MainWindow.xaml.cs - The Code-Behind Logic for the Application   == */
 /* ====================================================================== */
-/* This C# code has been updated to add a throughput display.           */
+/* This C# code has been updated to fix the reported errors.            */
 /* ====================================================================== */
 
+using Hardcodet.Wpf.TaskbarNotification;
 using Microsoft.Win32;
+using Ookii.Dialogs.Wpf;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -12,6 +14,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Media;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -19,7 +22,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using Ookii.Dialogs.Wpf;
+using System.Windows.Input;
 
 namespace LANFileSharing // <-- Make sure this namespace matches your project name
 {
@@ -33,7 +36,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
     public class TransferProgress : INotifyPropertyChanged
     {
         public string FileName { get; set; }
-        public string Direction { get; set; } // "Sending" or "Receiving"
+        public string Direction { get; set; }
+        public string FullPath { get; set; } // To store the final path for opening
 
         private string _status;
         public string Status
@@ -44,6 +48,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                 _status = value;
                 OnPropertyChanged(nameof(Status));
                 OnPropertyChanged(nameof(IsInProgress));
+                OnPropertyChanged(nameof(IsLink));
             }
         }
 
@@ -62,6 +67,8 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
         }
 
         public bool IsInProgress => Status == "In Progress";
+        public bool IsLink => Status == "Complete" && Direction == "Receiving" && !string.IsNullOrEmpty(FullPath);
+
         public CancellationTokenSource Cts { get; } = new CancellationTokenSource();
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -95,6 +102,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
         private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
         private SemaphoreSlim transferSemaphore;
+        private bool isExiting = false;
 
         public MainWindow()
         {
@@ -129,6 +137,74 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
             }
 
             transferSemaphore = new SemaphoreSlim(Properties.Settings.Default.MaxConcurrentTransfers);
+        }
+
+        // ======================================================================
+        // == UI EVENT HANDLERS (QoL Features)
+        // ======================================================================
+
+        private void Window_StateChanged(object sender, EventArgs e)
+        {
+            if (WindowState == WindowState.Minimized && Properties.Settings.Default.MinimizeToTray)
+            {
+                this.Hide();
+                TrayIcon.Visibility = Visibility.Visible;
+                TrayIcon.ShowBalloonTip("LAN File Sharer", "Running in the background.", BalloonIcon.Info);
+            }
+        }
+
+        private void TrayIcon_TrayMouseDoubleClick(object sender, RoutedEventArgs e)
+        {
+            this.Show();
+            this.WindowState = WindowState.Normal;
+            TrayIcon.Visibility = Visibility.Collapsed;
+        }
+
+        private void ShowMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            TrayIcon_TrayMouseDoubleClick(sender, e);
+        }
+
+        private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            isExiting = true;
+            this.Close();
+        }
+
+        private void FileName_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is TextBlock textBlock && textBlock.DataContext is TransferProgress transfer)
+            {
+                if (transfer.IsLink)
+                {
+                    try
+                    {
+                        if (File.Exists(transfer.FullPath))
+                        {
+                            // Open the folder containing the file and select it
+                            Process.Start("explorer.exe", $"/select,\"{transfer.FullPath}\"");
+                        }
+                        else if (Directory.Exists(transfer.FullPath))
+                        {
+                            // Open the folder itself
+                            Process.Start("explorer.exe", transfer.FullPath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Error opening item: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        private void ClearCompletedButton_Click(object sender, RoutedEventArgs e)
+        {
+            var completed = activeTransfers.Where(t => t.Status == "Complete" || t.Status == "Cancelled" || t.Status == "Failed").ToList();
+            foreach (var item in completed)
+            {
+                activeTransfers.Remove(item);
+            }
         }
 
         // ======================================================================
@@ -488,6 +564,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                     });
                     string sanitizedFileName = string.Join("_", name.Split(Path.GetInvalidFileNameChars()));
                     string finalPath = Path.Combine(savePath, sanitizedFileName);
+                    progress.FullPath = finalPath; // Set the full path for the link
                     ReceiveStreamToFile(reader, finalPath, size, progressReporter, progress.Cts.Token);
                     Dispatcher.Invoke(() => {
                         progress.Progress = 100;
@@ -510,6 +587,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
             if (Properties.Settings.Default.ShowReceiveNotification)
             {
+                if (Properties.Settings.Default.PlaySoundOnCompletion) SystemSounds.Asterisk.Play();
                 Dispatcher.Invoke(() => MessageBox.Show($"{fileCount} file(s) received and saved to your '{Path.GetFileName(savePath)}' folder.", "Transfer Complete", MessageBoxButton.OK, MessageBoxImage.Information));
             }
         }
@@ -539,6 +617,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
                         progress.Throughput = $"{p.speed:F2} MB/s";
                     });
                     string finalPath = Path.Combine(finalFolderPath, relativePath);
+                    progress.FullPath = finalFolderPath; // Set the full path to the root folder
                     Directory.CreateDirectory(Path.GetDirectoryName(finalPath));
                     ReceiveStreamToFile(reader, finalPath, size, progressReporter, progress.Cts.Token);
                     Dispatcher.Invoke(() => {
@@ -561,6 +640,7 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
             if (Properties.Settings.Default.ShowReceiveNotification)
             {
+                if (Properties.Settings.Default.PlaySoundOnCompletion) SystemSounds.Asterisk.Play();
                 Dispatcher.Invoke(() => MessageBox.Show($"Folder '{sanitizedRoot}' received and saved to your '{Path.GetFileName(savePath)}' folder.", "Transfer Complete", MessageBoxButton.OK, MessageBoxImage.Information));
             }
         }
@@ -638,9 +718,19 @@ namespace LANFileSharing // <-- Make sure this namespace matches your project na
 
         private void Window_Closing(object sender, CancelEventArgs e)
         {
-            cancellationTokenSource.Cancel();
-            udpListener?.Close();
-            tcpListener?.Stop();
+            if (Properties.Settings.Default.MinimizeToTray && !isExiting)
+            {
+                e.Cancel = true;
+                this.Hide();
+                TrayIcon.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                cancellationTokenSource.Cancel();
+                udpListener?.Close();
+                tcpListener?.Stop();
+                TrayIcon.Dispose();
+            }
         }
 
         private void StopTransferButton_Click(object sender, RoutedEventArgs e)
